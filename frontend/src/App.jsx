@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Upload, Activity, AlertCircle, FileText, Share2, Info, CheckCircle, Database } from 'lucide-react';
+import { Upload, Activity, AlertCircle, FileText, Share2, Info, CheckCircle, Database, MessageSquare, Download } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -11,6 +11,12 @@ function App() {
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
 
+  const [feedback, setFeedback] = useState({
+    assessment: '',
+    agreement: 'pending',
+    notes: ''
+  });
+
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
@@ -18,6 +24,7 @@ function App() {
       setPreview(URL.createObjectURL(selectedFile));
       setResult(null);
       setError(null);
+      setFeedback({ assessment: '', agreement: 'pending', notes: '' });
     }
   };
 
@@ -45,28 +52,45 @@ function App() {
     }
   };
 
+  const handleExport = () => {
+    if (!result) return;
+    const summary = {
+      image_name: file?.name,
+      timestamp: new Date().toISOString(),
+      model_result: result,
+      reviewer_feedback: feedback
+    };
+    const blob = new Blob([JSON.stringify(summary, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `retinagraph_report_${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="app-container">
       <header className="app-header">
         <div className="logo">
           <Activity size={32} color="#4fd1c5" />
           <h1>RetinaGraph AI</h1>
+          <span className="subtitle">Explainable Retinal Graph Analysis</span>
         </div>
         <div className="badge prototype-badge">
           Research Prototype
         </div>
       </header>
 
-      <main className="main-content">
-        <div className="disclaimer">
-          <AlertCircle size={20} />
-          <p><strong>Research Purpose Only:</strong> This application is a prototype architecture for graph-based fundus analysis. It is NOT clinically validated and must not be used for medical diagnosis. The model weights are currently untrained.</p>
-        </div>
+      <div className="disclaimer">
+        <AlertCircle size={20} />
+        <p><strong>Research Purpose Only:</strong> This application provides structural graph analysis for research review. It is NOT clinically validated and must not be used for medical diagnosis.</p>
+      </div>
 
-        <div className="dashboard">
+      <main className="main-layout">
+        <div className="left-column">
           <div className="panel upload-panel">
-            <h2>1. Input Image</h2>
-            
+            <h2>Image Input</h2>
             <div 
               className={`dropzone ${preview ? 'has-image' : ''}`}
               onClick={() => fileInputRef.current?.click()}
@@ -89,146 +113,152 @@ function App() {
               style={{ display: 'none' }} 
             />
 
-            <button 
-              className="analyze-btn" 
-              onClick={handleAnalyze} 
-              disabled={!file || loading}
-            >
-              {loading ? <span className="loader"></span> : 'Run Analysis Pipeline'}
-            </button>
-          </div>
-
-          <div className="panel results-panel">
-            <h2>2. Analysis Results</h2>
+            {file && (
+              <div className="controls">
+                <button 
+                  className="analyze-btn primary-btn" 
+                  onClick={handleAnalyze} 
+                  disabled={loading}
+                >
+                  {loading ? <span className="loader"></span> : 'Run Analysis'}
+                </button>
+                <button 
+                  className="reset-btn"
+                  onClick={() => { setFile(null); setPreview(null); setResult(null); setError(null); }}
+                  disabled={loading}
+                >
+                  Clear
+                </button>
+              </div>
+            )}
             
-            {!result && !loading && !error && (
-              <div className="empty-state">
-                <FileText size={48} color="#718096" />
-                <p>Upload an image and run the analysis to see results.</p>
-              </div>
-            )}
-
             {loading && (
-              <div className="loading-state">
-                <div className="pulse-graph">
-                  <Share2 size={64} className="spinning" color="#4fd1c5" />
-                </div>
-                <p>Constructing Graph & Running GAT Inference...</p>
+              <div className="analysis-progress">
+                <p>1. Image Validation...</p>
+                <p>2. CLAHE Preprocessing...</p>
+                <p>3. Topology Feature Extraction...</p>
+                <p>4. KNN Graph Construction...</p>
+                <p>5. GAT Inference...</p>
               </div>
             )}
-
+            
             {error && (
               <div className="error-state">
-                <AlertCircle size={32} color="#e53e3e" />
+                <AlertCircle size={24} color="#e53e3e" />
                 <p>{error}</p>
               </div>
             )}
-
+            
             {result && result.status === "rejected" && (
               <div className="error-state">
-                <AlertCircle size={48} color="#e53e3e" />
-                <h3 style={{ marginTop: '1rem', color: '#fc8181' }}>Image not suitable for retinal analysis.</h3>
-                <p style={{ marginTop: '0.5rem' }}>{result.reason}</p>
-              </div>
-            )}
-
-            {result && result.status !== "rejected" && (
-              <div className="results-content">
-                <div className="result-card primary">
-                  <div className="card-header">
-                    <CheckCircle size={24} color="#4fd1c5" />
-                    <h3>Prediction</h3>
-                  </div>
-                  <div className="prediction-value">{result.prediction}</div>
-                  <div className="model-status">
-                    <Info size={16} /> Status: {result.model_status}
-                  </div>
-                </div>
-
-                <div className="stats-grid">
-                  <div className="result-card">
-                    <div className="card-header">
-                      <Share2 size={20} />
-                      <h3>Graph Stats</h3>
-                    </div>
-                    <div className="stat-row">
-                      <span>Nodes (Keypoints):</span>
-                      <strong>{result.graph?.nodes}</strong>
-                    </div>
-                    <div className="stat-row">
-                      <span>Edges (Connections):</span>
-                      <strong>{result.graph?.edges}</strong>
-                    </div>
-                  </div>
-
-                  <div className="result-card">
-                    <div className="card-header">
-                      <Database size={20} />
-                      <h3>Evidence</h3>
-                    </div>
-                    <ul className="evidence-list">
-                      {result.evidence?.map((item, idx) => (
-                        <li key={idx}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="result-card explanation">
-                  <div className="card-header">
-                    <Info size={20} />
-                    <h3>Explanation Layer</h3>
-                  </div>
-                  <p className="explanation-text">{result.explanation?.message || result.explanation?.limitations}</p>
-                  
-                  {result.explanation?.top_nodes && (
-                    <div className="top-evidence-section">
-                      <h4>Top Important Structural Nodes</h4>
-                      <div className="evidence-table-container">
-                        <table className="evidence-table">
-                          <thead>
-                            <tr>
-                              <th>Node ID</th>
-                              <th>Importance</th>
-                              <th>(X, Y)</th>
-                              <th>Vesselness</th>
-                              <th>Intensity</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {result.explanation.top_nodes.slice(0, 5).map((node, i) => (
-                              <tr key={i}>
-                                <td>{node.node_index}</td>
-                                <td>{node.importance.toFixed(3)}</td>
-                                <td>({node.coordinates[0].toFixed(1)}, {node.coordinates[1].toFixed(1)})</td>
-                                <td>{node.features?.vesselness?.toFixed(3)}</td>
-                                <td>{node.features?.intensity?.toFixed(3)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      
-                      {result.explanation?.faithfulness && (
-                        <div className="faithfulness-section" style={{marginTop: '1rem', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '4px'}}>
-                          <h4>Experimental Faithfulness</h4>
-                          <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem'}}>
-                            <span>Original Confidence: {result.explanation.faithfulness.original_confidence.toFixed(3)}</span>
-                            <span>Top-Masked Drop: {result.explanation.faithfulness.confidence_drop_top.toFixed(3)}</span>
-                            <span>Random Drop: {result.explanation.faithfulness.confidence_drop_random.toFixed(3)}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  <div className="meta-info">
-                    Method: {result.explanation?.important_regions_method}
-                  </div>
-                </div>
+                <AlertCircle size={24} color="#e53e3e" />
+                <p><strong>Validation Failed:</strong> {result.reason}</p>
               </div>
             )}
           </div>
+        </div>
+
+        <div className="right-column">
+          {result && result.status !== "rejected" ? (
+            <>
+              <div className="panel prediction-panel">
+                <h2>Model Prediction</h2>
+                <div className="prediction-content">
+                  <div className="prediction-main">
+                    <CheckCircle size={32} color="#4fd1c5" />
+                    <span className="pred-text">{result.prediction || "N/A"}</span>
+                  </div>
+                  <div className="prediction-meta">
+                    <p><strong>Confidence:</strong> {result.confidence ? (result.confidence * 100).toFixed(1) + "%" : "Unavailable"}</p>
+                    <p><strong>Status:</strong> {result.model_status}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel evidence-panel">
+                <h2>Evidence Visualization</h2>
+                <div className="evidence-viewer">
+                  <div className="image-overlay-container" style={{ position: 'relative', width: '100%', maxWidth: '512px', margin: '0 auto' }}>
+                    <img src={preview} alt="Fundus" style={{ width: '100%', display: 'block', borderRadius: '4px' }} />
+                    <svg viewBox="0 0 512 512" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                      {/* Edges */}
+                      {result.explanation?.top_edges?.map((edge, i) => (
+                        <line 
+                          key={`edge-${i}`}
+                          x1={edge.source_coords[0]} 
+                          y1={edge.source_coords[1]} 
+                          x2={edge.target_coords[0]} 
+                          y2={edge.target_coords[1]} 
+                          stroke="rgba(236, 201, 75, 0.8)" 
+                          strokeWidth="3" 
+                        />
+                      ))}
+                      {/* Nodes */}
+                      {result.explanation?.top_nodes?.map((node, i) => (
+                        <circle 
+                          key={`node-${i}`}
+                          cx={node.coordinates[0]} 
+                          cy={node.coordinates[1]} 
+                          r="6" 
+                          fill="rgba(245, 101, 101, 0.9)" 
+                          stroke="white"
+                          strokeWidth="1.5"
+                        />
+                      ))}
+                    </svg>
+                  </div>
+                  <p className="caption">Top {result.explanation?.top_nodes?.length || 0} highest-attention topological junctions.</p>
+                </div>
+                
+                <div className="graph-stats">
+                  <div className="stat-box">
+                    <Database size={16} /> Nodes: {result.graph?.nodes}
+                  </div>
+                  <div className="stat-box">
+                    <Share2 size={16} /> Edges: {result.graph?.edges}
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel feedback-panel">
+                <h2>Reviewer Feedback</h2>
+                <div className="feedback-form">
+                  <div className="form-group">
+                    <label>Agreement with Model:</label>
+                    <select 
+                      value={feedback.agreement} 
+                      onChange={(e) => setFeedback({...feedback, agreement: e.target.value})}
+                    >
+                      <option value="pending">Pending Review</option>
+                      <option value="agree">Agree</option>
+                      <option value="disagree">Disagree</option>
+                      <option value="unsure">Unsure / Need More Data</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Reviewer Notes / Structural Assessment:</label>
+                    <textarea 
+                      rows="4" 
+                      placeholder="Enter research notes on highlighted structures..."
+                      value={feedback.notes}
+                      onChange={(e) => setFeedback({...feedback, notes: e.target.value})}
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div className="action-panel">
+                <button className="export-btn" onClick={handleExport}>
+                  <Download size={18} /> Export JSON Report
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="panel empty-panel">
+              <FileText size={48} color="#718096" />
+              <p>Analysis results will appear here.</p>
+            </div>
+          )}
         </div>
       </main>
     </div>
