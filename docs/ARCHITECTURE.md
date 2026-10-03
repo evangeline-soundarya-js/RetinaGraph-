@@ -6,10 +6,20 @@ It accepts an image, extracts feature structures (vessels, junctions), construct
 
 ## Pipeline Components
 
-1. **Preprocessing**: Validates the input format (JPG, PNG), resizes the image to a standardized dimension, normalizes intensities, and performs basic quality checks.
-2. **Feature Extraction**: Uses conventional computer vision (OpenCV/scikit-image) to extract prototype features. Specifically, it extracts vessel-like structures, junctions, and regional intensity statistics.
-3. **Graph Construction**:
-    - **Nodes**: Represent key structural points (e.g., vessel junctions or uniformly sampled keypoints on vessels).
+1. **Preprocessing**: 
+    - Loads images safely (handling grayscale, RGB, RGBA correctly to RGB).
+    - Determines the retinal field bounding box to crop excess black background safely.
+    - Resizes to a consistent `(512, 512)` maintaining aspect ratio by padding with black (letterboxing), avoiding retinal distortion.
+    - Extracts the Green channel.
+    - Enhances contrast using CLAHE (`clipLimit=2.0`, `tileGridSize=(8,8)`).
+    - Normalizes the output strictly to `float32 [0.0, 1.0]` yielding a deterministic `vessel_representation` alongside the unmodified padded RGB image.
+2. **Feature Extraction**: 
+    - Derives meaningful structural coordinates deterministically from the image without random guessing or hard-coding.
+    - **Vesselness**: Applies a Frangi filter.
+    - **Skeletonization**: Converts thresholded vessels to a 1-pixel wide skeleton.
+    - **Topology Detection**: Scans the skeleton to detect exact Endpoints (1-neighbor) and Junctions (>=3 neighbors). Closely clustered junction pixels are merged via morphological dilation and connected components.
+    - **Features**: For each candidate coordinate, generates a normalized tensor `[norm_x, norm_y, intensity, vesselness]`.
+    - **Graceful Failure**: Safely returns an explicit failure state if no topology is found, preventing the downstream generation of fake graphs.
     - **Edges**: Represent spatial proximity or structural connectivity between nodes.
     - **Node Features**: Local intensity and structural properties (e.g., vessel thickness, local contrast).
 4. **Graph Neural Network (GAT)**:

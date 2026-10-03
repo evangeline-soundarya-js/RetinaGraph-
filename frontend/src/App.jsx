@@ -124,7 +124,15 @@ function App() {
               </div>
             )}
 
-            {result && (
+            {result && result.status === "rejected" && (
+              <div className="error-state">
+                <AlertCircle size={48} color="#e53e3e" />
+                <h3 style={{ marginTop: '1rem', color: '#fc8181' }}>Image not suitable for retinal analysis.</h3>
+                <p style={{ marginTop: '0.5rem' }}>{result.reason}</p>
+              </div>
+            )}
+
+            {result && result.status !== "rejected" && (
               <div className="results-content">
                 <div className="result-card primary">
                   <div className="card-header">
@@ -145,11 +153,11 @@ function App() {
                     </div>
                     <div className="stat-row">
                       <span>Nodes (Keypoints):</span>
-                      <strong>{result.graph.nodes}</strong>
+                      <strong>{result.graph?.nodes}</strong>
                     </div>
                     <div className="stat-row">
                       <span>Edges (Connections):</span>
-                      <strong>{result.graph.edges}</strong>
+                      <strong>{result.graph?.edges}</strong>
                     </div>
                   </div>
 
@@ -159,7 +167,7 @@ function App() {
                       <h3>Evidence</h3>
                     </div>
                     <ul className="evidence-list">
-                      {result.evidence.map((item, idx) => (
+                      {result.evidence?.map((item, idx) => (
                         <li key={idx}>{item}</li>
                       ))}
                     </ul>
@@ -171,9 +179,9 @@ function App() {
                     <Info size={20} />
                     <h3>Explanation Layer</h3>
                   </div>
-                  <p className="explanation-text">{result.explanation.message}</p>
+                  <p className="explanation-text">{result.explanation?.message}</p>
                   <div className="meta-info">
-                    Method: {result.explanation.important_regions_method}
+                    Method: {result.explanation?.important_regions_method}
                   </div>
                 </div>
               </div>

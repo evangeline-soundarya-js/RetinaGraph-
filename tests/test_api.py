@@ -33,11 +33,10 @@ def test_health():
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-def test_analyze_endpoint():
-    # Create a dummy image
+def test_analyze_endpoint_valid():
+    # Test A - Valid/plausible retinal image
     dummy_image = create_dummy_image()
     
-    # Send request
     response = client.post(
         "/analyze", 
         files={"file": ("test_fundus.png", dummy_image, "image/png")}
@@ -46,7 +45,6 @@ def test_analyze_endpoint():
     assert response.status_code == 200
     data = response.json()
     
-    # Validate response structure
     assert data["status"] == "success"
     assert "prediction" in data
     assert data["confidence"] is None
@@ -55,3 +53,102 @@ def test_analyze_endpoint():
     assert "edges" in data["graph"]
     assert "model_status" in data
     assert data["model_status"] == "prototype/untrained"
+
+def test_analyze_endpoint_portrait():
+    # Test B - Human portrait (represented by e.g. a blue/white heavy image or lacking circular mask)
+    # Let's create an image that fails the color/structure check
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    img[:] = [200, 200, 255] # Mostly blue/white, not red/orange, not circular
+    
+    pil_img = Image.fromarray(img)
+    byte_io = io.BytesIO()
+    pil_img.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    
+    response = client.post(
+        "/analyze", 
+        files={"file": ("portrait.png", byte_io, "image/png")}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "rejected"
+    assert data["model_status"] == "not_run"
+    assert data["prediction"] is None
+    assert data["graph"] is None
+
+def test_analyze_endpoint_blank():
+    # Test C - Blank image (uniform color)
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    img[:] = [128, 128, 128] # Uniform gray
+    
+    pil_img = Image.fromarray(img)
+    byte_io = io.BytesIO()
+    pil_img.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    
+    response = client.post(
+        "/analyze", 
+        files={"file": ("blank.png", byte_io, "image/png")}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "rejected"
+    assert data["model_status"] == "not_run"
+
+def test_analyze_endpoint_white():
+    # Test D - Completely white image
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    img[:] = [255, 255, 255]
+    
+    pil_img = Image.fromarray(img)
+    byte_io = io.BytesIO()
+    pil_img.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    
+    response = client.post(
+        "/analyze", 
+        files={"file": ("white.png", byte_io, "image/png")}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "rejected"
+    assert data["model_status"] == "not_run"
+
+def test_analyze_endpoint_dark():
+    # Test E - Completely dark image
+    img = np.zeros((512, 512, 3), dtype=np.uint8)
+    img[:] = [2, 2, 2]
+    
+    pil_img = Image.fromarray(img)
+    byte_io = io.BytesIO()
+    pil_img.save(byte_io, 'PNG')
+    byte_io.seek(0)
+    
+    response = client.post(
+        "/analyze", 
+        files={"file": ("dark.png", byte_io, "image/png")}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "rejected"
+    assert data["model_status"] == "not_run"
+
+def test_analyze_endpoint_corrupted():
+    # Test F - Corrupted/unreadable image
+    corrupted_data = io.BytesIO(b"This is not a valid image file")
+    
+    response = client.post(
+        "/analyze", 
+        files={"file": ("corrupted.png", corrupted_data, "image/png")}
+    )
+    
+    # Should be handled gracefully without crashing the API
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "rejected"
+    assert data["model_status"] == "not_run"
+    assert data["checks"]["decodable"] is False

@@ -6,6 +6,7 @@ This is a working end-to-end prototype for a graph-based analysis pipeline of re
 > This application is NOT clinically validated. It does not possess medical diagnostic capabilities. The model weights are currently initialized randomly to demonstrate the graph architecture and pipeline execution.
 
 ## Features
+- **Input Plausibility Validation**: Heuristic gate to reject non-fundus, blank, or corrupted images early.
 - **Image Preprocessing**: Adaptive resizing, green channel extraction, and CLAHE normalization.
 - **Feature Extraction**: Structural keypoint and junction extraction using Frangi vesselness and morphological detection.
 - **Graph Construction**: Dynamic K-Nearest Neighbors (KNN) graph representation of the retinal structure.
