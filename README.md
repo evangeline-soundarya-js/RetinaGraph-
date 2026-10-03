@@ -70,7 +70,28 @@ npm run dev
 ```
 The frontend UI will be available at `http://localhost:5173`. Open this link in your browser to interact with the application.
 
+## Dataset and Training Pipeline
+
+This project now includes a reproducible labeled-dataset training path that reuses the existing preprocessing, vessel feature extraction, graph construction, and GAT model. The dataset path is configurable via either the `RETINAGRAPH_DATASET_PATH` environment variable or the CLI flag on the training script.
+
+Example:
+
+```powershell
+$env:RETINAGRAPH_DATASET_PATH = "data"
+python scripts/train.py --dataset-path data --metadata-file data/metadata/metadata.csv --epochs 2 --batch-size 2 --max-samples 20
+```
+
+The metadata CSV should contain at least:
+- `image_path`
+- `label`
+- `dataset_source`
+- `image_id`
+- `patient_id` (optional, but strongly preferred for patient-level splitting)
+
+The loader supports integer labels directly and maps common text labels like `No DR`, `Mild`, `Moderate`, and `Severe` to numeric values in a consistent way. If patient IDs are available, the split is performed at the patient level to avoid leakage; otherwise the loader falls back to image-level splitting.
+
 ## Limitations & Future Work
 - Please review `docs/ARCHITECTURE.md` and `docs/RESEARCH_STATUS.md` for full implementation details.
 - The KNN graph builder uses Scipy `cKDTree` as a fallback for PyG `knn_graph` to avoid local C++ compilation issues.
 - The model predictions are currently stochastic due to untrained random weights.
+- A full clinical dataset and evaluation pipeline are intentionally outside this training-only prototype phase.
