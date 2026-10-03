@@ -97,29 +97,39 @@ class InferencePipeline:
         data = self.graph_builder.build_graph(keypoints, node_features)
         
         # 4. GAT Inference
-        with torch.no_grad():
-            out, attention_weights = self.model(data.x, data.edge_index, batch=None)
-            probs = F.softmax(out, dim=1)
-            prediction_idx = torch.argmax(probs, dim=1).item()
+        # Validate Dimensions Explicitly
+        if data.x.shape[1] != self.model.config["in_channels"]:
+            raise ValueError(f"Expected node feature dimension {self.model.config['in_channels']}, received {data.x.shape[1]}")
             
-        classes = ["Normal", "Abnormal"]
-        
+        if data.edge_attr.shape[1] != self.model.config["edge_dim"]:
+            raise ValueError(f"Expected edge attribute dimension {self.model.config['edge_dim']}, received {data.edge_attr.shape[1]}")
+            
+        with torch.no_grad():
+            out, attention_weights = self.model(data.x, data.edge_index, edge_attr=data.edge_attr, batch=None)
+            probs = F.softmax(out, dim=1)
+            raw_logits = out.cpu().numpy().tolist()
+            
         # 5. Explainability / Evidence
         explanation = {
-            "num_nodes": data.num_nodes,
-            "num_edges": data.num_edges,
+            "num_nodes": data.stats["num_nodes"],
+            "num_edges": data.stats["num_edges"],
             "important_regions_method": "attention_weights (placeholder)",
             "message": "Model is untrained. This prediction is based on randomly initialized weights."
         }
         
         return {
             "status": "success",
-            "prediction": classes[prediction_idx],
+            "prediction": None,
             "confidence": None,
+            "raw_logits": raw_logits,
             "image_metadata": metadata,
             "graph": {
-                "nodes": data.num_nodes,
-                "edges": data.num_edges
+                "nodes": data.stats["num_nodes"],
+                "edges": data.stats["num_edges"],
+                "avg_degree": data.stats["avg_degree"],
+                "connected_components": data.stats["connected_components"],
+                "density": data.stats["density"],
+                "isolated_nodes": data.stats["isolated_nodes"]
             },
             "evidence": ["Extracted vessel network graph", "Node connectivity"],
             "explanation": explanation,

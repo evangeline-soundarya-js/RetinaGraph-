@@ -20,14 +20,25 @@ It accepts an image, extracts feature structures (vessels, junctions), construct
     - **Topology Detection**: Scans the skeleton to detect exact Endpoints (1-neighbor) and Junctions (>=3 neighbors). Closely clustered junction pixels are merged via morphological dilation and connected components.
     - **Features**: For each candidate coordinate, generates a normalized tensor `[norm_x, norm_y, intensity, vesselness]`.
     - **Graceful Failure**: Safely returns an explicit failure state if no topology is found, preventing the downstream generation of fake graphs.
-    - **Edges**: Represent spatial proximity or structural connectivity between nodes.
-    - **Node Features**: Local intensity and structural properties (e.g., vessel thickness, local contrast).
+3. **Graph Construction**:
+    - Constructs a deterministic, directed spatial graph using Scipy's `cKDTree`.
+    - **Nodes**: Exact mathematical coordinates derived from Phase 3 topology extraction.
+    - **Node Features**: `[norm_x, norm_y, intensity, vesselness]`.
+    - **Edges**: Connects each node to its $k$ closest topological neighbors (configurable, default $k=5$). 
+    - **Edge Features**: `[euclidean_distance, relative_x, relative_y]`.
+    - **Graph Statistics**: Automatically computes degree stats, component connectivity, and density for research auditing.
+    - Outputs a standard `torch_geometric.data.Data` object.
 4. **Graph Neural Network (GAT)**:
-    - Built with PyTorch Geometric.
-    - Includes multi-head graph attention layers.
-    - Outputs a graph-level classification and attention weights for explainability.
+    - Built with PyTorch Geometric (`RetinaGAT`).
+    - **Input Channel**: `in_channels=4` (Node topology features).
+    - **Edge Dimension**: `edge_dim=3` (Passed explicitly via GATConv).
+    - **Hidden Channel**: `hidden_channels=16`.
+    - **Multi-Head**: 2 attention heads (Output of Layer 1 concatenated, Layer 2 averaged).
+    - **Pooling**: `global_mean_pool` translates local structure to a singular representation per retina.
+    - **Classifier**: Linear projection from `16` hidden features to `2` outcome logits.
+    - **Status**: Currently explicitly marked `prototype/untrained`. It performs structurally deterministic matrix operations but does not output medical confidence.
 5. **Explainability Layer**: Converts attention weights and graph structures into visualizable evidence.
-6. **Backend & Frontend**: FastAPI serves the model, and a React/Vite frontend provides the UI for interaction.
+6. **Backend & Frontend**: FastAPI serves the model natively. The API guarantees null clinical predictions while the model remains untrained.
 
 ## Limitations
 - This is a **research prototype**. 

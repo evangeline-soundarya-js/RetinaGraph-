@@ -53,3 +53,33 @@
 - 18/18 Pytest suite passed (7 API, 7 Preprocessing, 4 Extractor).
 - Hardcoded coordinates and random point generation routines were strictly removed.
 - Valid coordinates dynamically track the synthetic test structures perfectly.
+
+## Experiment 5: Robust Retinal Graph Construction (Phase 4)
+**Date**: 2026-10-03
+**Objective**: Construct a deterministic, mathematically reproducible PyTorch Geometric graph from Phase 3 topological features without modifying the downstream GAT yet.
+**Setup**: 
+- Rebuilt `GraphBuilder` to explicitly handle edge cases ($N=0, 1, \le k$) safely without crashing.
+- Modified spatial KNN logic to prevent self-loop duplication when scanning zero-distance duplicate points.
+- Extracted explicit Edge Features (`euclidean_distance, relative_x, relative_y`).
+- Implemented rich `data.stats` generation (Degree distribution, Density, Connected Components).
+- Added `scripts/visualize_graph.py` to trace raw topology -> graph connections visually.
+**Status**: Completed successfully.
+**Results**:
+- 24/24 Pytest suite assertions passed (including new Graph structural bounds tests).
+- Visual verification confirmed edges intelligently connect extracted topological nodes.
+- PyG `Data` tensors correctly shaped: `x=[N, 4]`, `edge_index=[2, E]`, `edge_attr=[E, 3]`.
+
+## Experiment 6: GAT Model Integration (Phase 5)
+**Date**: 2026-10-03
+**Objective**: Connect Phase 4 PyG graph to the downstream GAT accurately without allowing false medical predictions to surface.
+**Setup**: 
+- Re-configured `RetinaGAT` with `in_channels=4` and `edge_dim=3`.
+- Validated Layer 1 & 2 dimensional stability with multi-head attention arrays.
+- Enforced `global_mean_pool` for deterministic uniform graph summarization.
+- Modified `InferencePipeline` to safely ingest `edge_attr` and explicitly nullify class predictions and confidence arrays.
+- Appended `raw_logits` alongside structural metadata.
+**Status**: Completed successfully.
+**Results**:
+- 28/28 Pytest suite assertions passed (API, Extractor, Graph, and 4 new Model constraints).
+- Edge cases ($N \le 1$) process cleanly through GAT padding self-loops.
+- End-to-end visual tests produce zero random tensors, strictly following: `Float32 Matrix → Topology Filter → PyG Structure → Torch Linear Classifier`.
