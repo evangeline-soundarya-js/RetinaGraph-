@@ -179,7 +179,49 @@ function App() {
                     <Info size={20} />
                     <h3>Explanation Layer</h3>
                   </div>
-                  <p className="explanation-text">{result.explanation?.message}</p>
+                  <p className="explanation-text">{result.explanation?.message || result.explanation?.limitations}</p>
+                  
+                  {result.explanation?.top_nodes && (
+                    <div className="top-evidence-section">
+                      <h4>Top Important Structural Nodes</h4>
+                      <div className="evidence-table-container">
+                        <table className="evidence-table">
+                          <thead>
+                            <tr>
+                              <th>Node ID</th>
+                              <th>Importance</th>
+                              <th>(X, Y)</th>
+                              <th>Vesselness</th>
+                              <th>Intensity</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {result.explanation.top_nodes.slice(0, 5).map((node, i) => (
+                              <tr key={i}>
+                                <td>{node.node_index}</td>
+                                <td>{node.importance.toFixed(3)}</td>
+                                <td>({node.coordinates[0].toFixed(1)}, {node.coordinates[1].toFixed(1)})</td>
+                                <td>{node.features?.vesselness?.toFixed(3)}</td>
+                                <td>{node.features?.intensity?.toFixed(3)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {result.explanation?.faithfulness && (
+                        <div className="faithfulness-section" style={{marginTop: '1rem', padding: '0.5rem', background: 'rgba(0,0,0,0.2)', borderRadius: '4px'}}>
+                          <h4>Experimental Faithfulness</h4>
+                          <div style={{display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem'}}>
+                            <span>Original Confidence: {result.explanation.faithfulness.original_confidence.toFixed(3)}</span>
+                            <span>Top-Masked Drop: {result.explanation.faithfulness.confidence_drop_top.toFixed(3)}</span>
+                            <span>Random Drop: {result.explanation.faithfulness.confidence_drop_random.toFixed(3)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="meta-info">
                     Method: {result.explanation?.important_regions_method}
                   </div>

@@ -104,24 +104,54 @@ class InferencePipeline:
         if data.edge_attr.shape[1] != self.model.config["edge_dim"]:
             raise ValueError(f"Expected edge attribute dimension {self.model.config['edge_dim']}, received {data.edge_attr.shape[1]}")
             
-        with torch.no_grad():
-            out, attention_weights = self.model(data.x, data.edge_index, edge_attr=data.edge_attr, batch=None)
-            probs = F.softmax(out, dim=1)
-            raw_logits = out.cpu().numpy().tolist()
-            
+        # Try loading checkpoint if status is still untrained
+        if self.model_status == "prototype/untrained":
+            import os
+            ckpt_path = "checkpoints/best_model.pt"
+            if os.path.exists(ckpt_path):
+                try:
+                    self.model.load_checkpoint(ckpt_path, device="cpu")
+                    self.model_status = "trained"
+                except Exception as e:
+                    print(f"Failed to load checkpoint: {e}")
+                    
         # 5. Explainability / Evidence
+        from src.inference.explainer import GATExplainer
+        explainer = GATExplainer(self.model)
+        explanation_data = explainer.explain(data, top_k=10)
+        
+        prediction_idx = explanation_data["prediction"]
+        classes = ["Normal", "Abnormal"]
+        
+        # If untrained, explicitly nullify predictions
+        if self.model_status == "prototype/untrained":
+            final_pred = None
+            final_conf = None
+            explanation_data["limitations"] += " MODEL IS UNTRAINED - NO MEDICAL PREDICTION."
+        else:
+            final_pred = classes[prediction_idx]
+            final_conf = explanation_data["confidence"]
+            
+        # Faithfulness check
+        top_indices = [n["node_index"] for n in explanation_data["top_nodes"]]
+        faithfulness = explainer.measure_faithfulness(data, top_indices)
+        explanation_data["faithfulness_experiment"] = faithfulness
+            
         explanation = {
             "num_nodes": data.stats["num_nodes"],
             "num_edges": data.stats["num_edges"],
-            "important_regions_method": "attention_weights (placeholder)",
-            "message": "Model is untrained. This prediction is based on randomly initialized weights."
+            "important_regions_method": explanation_data["method"],
+            "limitations": explanation_data["limitations"],
+            "top_nodes": explanation_data["top_nodes"],
+            "top_edges": explanation_data["top_edges"],
+            "faithfulness": faithfulness
         }
         
         return {
             "status": "success",
-            "prediction": None,
-            "confidence": None,
-            "raw_logits": raw_logits,
+            "prediction": final_pred,
+            "confidence": final_conf,
+            "raw_logits": explanation_data["raw_logits"],
             "image_metadata": metadata,
             "graph": {
                 "nodes": data.stats["num_nodes"],
@@ -131,7 +161,7 @@ class InferencePipeline:
                 "density": data.stats["density"],
                 "isolated_nodes": data.stats["isolated_nodes"]
             },
-            "evidence": ["Extracted vessel network graph", "Node connectivity"],
+            "evidence": ["High attention graph regions mapped to topological endpoints/junctions"],
             "explanation": explanation,
             "model_status": self.model_status
         }

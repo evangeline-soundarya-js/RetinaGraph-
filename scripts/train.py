@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.nn import CrossEntropyLoss
 from torch.optim import AdamW
-from torch.utils.data import DataLoader
+from torch_geometric.loader import DataLoader
 
 from src.data.dataset import RetinaGraphDataset, build_dataset_index, split_dataset
 from src.models.gat_model import RetinaGAT

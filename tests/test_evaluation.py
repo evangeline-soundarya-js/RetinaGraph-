@@ -86,7 +86,7 @@ def test_baseline_training_smoke(tmp_path):
         graphs.append(graph)
     model = train_baseline(graphs, num_classes=2, epochs=2)
     assert isinstance(model, torch.nn.Module)
-    out = model(torch.rand((4,), dtype=torch.float32).unsqueeze(0))
+    out = model(torch.rand((8,), dtype=torch.float32).unsqueeze(0))
     assert out.shape == (1, 2)
 
 

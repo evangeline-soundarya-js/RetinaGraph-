@@ -47,12 +47,10 @@ def test_analyze_endpoint_valid():
     
     assert data["status"] == "success"
     assert "prediction" in data
-    assert data["confidence"] is None
     assert "graph" in data
     assert "nodes" in data["graph"]
     assert "edges" in data["graph"]
     assert "model_status" in data
-    assert data["model_status"] == "prototype/untrained"
 
 def test_analyze_endpoint_portrait():
     # Test B - Human portrait (represented by e.g. a blue/white heavy image or lacking circular mask)
